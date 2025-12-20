@@ -1,8 +1,8 @@
 # 简单部署流程
 
-### 概要
+### 特色
 
-利用 [icmp9.com](https://icmp9.com/proxy) 提供的免费代理网络，借助1台vps实现聚合多个国家的网络节点。
+利用 [icmp9.com](https://icmp9.com/proxy) 提供的免费代理网络，借助1台vps实现落地全球多个国家的网络节点。
 
 ### 效果图
 <img height="300" alt="image" src="https://github.com/user-attachments/assets/3ab617cf-94e4-46fb-ae15-ed219f2a5896" />
@@ -12,20 +12,20 @@
 ### 前提条件
 
 1. 拥有任意1台有公网IP的VPS，可以是icmp9送的虚机，也可以是其他的， VPS可以是IP双栈，也可以是任意IP单栈(也就是只有ipv4或ipv6都可以)。以下所有脚本命令只需要在这台vps上执行即可
-2. 1个可以在Zero Trust创建隧道的Cloudflare账号
+2. [可选] Cloudflare固定隧道模式，需要1个可以在Zero Trust创建隧道的Cloudflare账号
 
 ---
 
 ## 部署步骤
 
-### 1.注册icmp9.com 账号，获取API KEY
+### [必需] 1.注册icmp9.com 账号，获取API KEY
 
 ![获取获取API KEYl 设置](https://github.com/user-attachments/assets/e55908be-f4e3-4294-aaee-4855fca2f3ec)
 
-### 2.放行VPS的IP地址，双栈IP的VPS，IPv4和IPv6地址都要放行
+### [必需] 2.放行VPS的IP地址，双栈IP的VPS，IPv4和IPv6地址都要放行
 ![放行部署VPS的IP地址](https://github.com/user-attachments/assets/ceb9037d-3bdd-4789-9f71-207e6bc2c094)
 
-### 3.Cloudflare隧道相关
+### [可选] 3.使用cloudflare固定隧道模式
 
 **获取隧道token，格式： eyJhIjoiZmJ****OayJ9**
 
@@ -35,32 +35,36 @@
 
 ![Cloudflare Tunnel 设置](https://github.com/user-attachments/assets/06f93523-145f-445f-98ea-22a253b85b15)
 
-### 4. 部署仅支持docker方式
+### [可选] 4.设置swap虚拟内存, 适用于低配置VPS(CPU小于1核，内存小于1G，剩余硬盘空间大于5G)
 
-#### 一键交互脚本方式
-
-- **设置swap虚拟内存（可选步骤，建议VPS配置较低的使用）**
-
-⚠️ icmp9.com送的VPS,请务必先设置1G swap虚拟内存,再部署一键脚本
+⚠️ 设置swap成功后需要重启VPS才能生效
 
 ```bash
 bash <(wget -qO- https://ghproxy.lvedong.eu.org/https://raw.githubusercontent.com/nap0o/icmp9.com/main/swap.sh)
 ```
 
-⚠️ 设置swap成功后需要重启VPS才能生效
+- icmp9.com送的虚机,请务必先设置1G swap虚拟内存,再部署一键脚本
 
 <img height="350" alt="image" src="https://github.com/user-attachments/assets/fe436d79-25b0-4276-81b3-c4c2265fa35d" /><br /> 
 
+### [必需] 5.部署仅支持docker方式，请从以下3个部署方式选择
 
-- **使用一键交互脚本部署**
+#### 方式1：使用一键交互脚本部署
 
 ```bash
 bash <(wget -qO- https://ghproxy.lvedong.eu.org/https://raw.githubusercontent.com/nap0o/icmp9.com/main/install.sh)  
 ```
 
-<img height="600" src="https://github.com/user-attachments/assets/3a67cd2f-ca15-46ed-a332-552388441ea9" />
+**cloudflare临时隧道模式执行日志**
 
-#### Docker run方式
+<img height="600" src="https://github.com/user-attachments/assets/3a67cd2f-ca15-46ed-a332-552388441ea9" /><br />
+
+
+**cloudflare固定隧道模式执行日志**
+
+<img height="600" src="https://github.com/user-attachments/assets/3a67cd2f-ca15-46ed-a332-552388441ea9" /><br />
+
+#### 方式2：Docker run方式
 
 ```yaml
 docker run -d \
@@ -77,7 +81,7 @@ docker run -d \
   nap0o/icmp9:latest
 ```
 
-#### Docker compose方式
+#### 方式3：Docker compose方式
 
 ```yaml
 services:
@@ -103,7 +107,7 @@ services:
       - ./data/subscribe:/root/subscribe
 ```
 
-### 5. 节点订阅地址
+### [可选] 6.节点订阅地址
 
 **方法1：通过docker日志获取**
 
@@ -127,7 +131,7 @@ https://{ICMP9_SERVER_HOST}/{ICMP9_API_KEY}
 - 格式如： https://icmp9.nezha.pp.ua/b58828c1-4df5-4156-ee77-a889968533ae 
 
 
-### 6. 节点不通的自助排查步骤
+### [可选] 7.节点不通的自助排查步骤
 
 **1. 检查VPS时间是否正确，如果误差超过30秒，节点会出错**
 

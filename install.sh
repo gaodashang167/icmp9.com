@@ -1,22 +1,16 @@
 #!/bin/sh
 
-# 定义颜色 (使用 \033 或 \133 均可，printf 兼容性更好)
+# 定义颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
-# 定义一个打印函数，方便调用且保证兼容
-# 用法: info "内容"
-info() {
-    printf "${GREEN}%s${NC}\n" "$1"
-}
-warn() {
-    printf "${YELLOW}%s${NC}\n" "$1"
-}
-error() {
-    printf "${RED}%s${NC}\n" "$1"
-}
+# 辅助函数
+info() { printf "${GREEN}%s${NC}\n" "$1"; }
+warn() { printf "${YELLOW}%s${NC}\n" "$1"; }
+error() { printf "${RED}%s${NC}\n" "$1"; }
 
 printf "${GREEN}=============================================${NC}\n"
 printf "${GREEN}        ICMP9聚合落地节点部署脚本                ${NC}\n"
@@ -59,30 +53,52 @@ cd "$WORK_DIR" || exit
 # 3. 收集用户输入
 printf "\n${YELLOW}>>> 请输入配置参数 <<<${NC}\n"
 
+# API_KEY (UUID) - 必填
 while [ -z "$API_KEY" ]; do
-    printf "1. 请输入 ICMP9_API_KEY (必填): "
+    printf "1. 请输入 ICMP9_API_KEY (用户UUID, 必填): "
     read -r API_KEY
 done
 
-while [ -z "$SERVER_HOST" ]; do
-    printf "2. 请输入 Tunnel 域名 (SERVER_HOST) (必填): "
-    read -r SERVER_HOST
-done
+# 选择隧道模式 (修改：交换了1和2的顺序)
+printf "\n2. 请选择 Cloudflare 隧道模式:\n"
+printf "   [1] 临时隧道 (随机域名，无需配置)\n"
+printf "   [2] 固定隧道 (需要自备域名和Token)\n"
+printf "   请选择 [1/2] (默认: 1): "
+read -r MODE_INPUT
+[ -z "$MODE_INPUT" ] && MODE_INPUT="1"
 
-while [ -z "$TOKEN" ]; do
-    printf "3. 请输入 Tunnel Token (必填): "
-    read -r TOKEN
-done
+if [ "$MODE_INPUT" = "2" ]; then
+    # --- 固定隧道模式 (选项2) ---
+    TUNNEL_MODE="fixed"
+    while [ -z "$SERVER_HOST" ]; do
+        printf "   -> 请输入绑定域名 (SERVER_HOST) (必填): "
+        read -r SERVER_HOST
+    done
 
-printf "4. 是否仅 IPv6 (True/False) [默认: False]: "
+    while [ -z "$TOKEN" ]; do
+        printf "   -> 请输入 Cloudflare Tunnel Token (必填): "
+        read -r TOKEN
+    done
+else
+    # --- 临时隧道模式 (选项1或默认) ---
+    TUNNEL_MODE="temp"
+    SERVER_HOST="" # 留空
+    TOKEN=""       # 留空
+    info "   -> 已选择临时隧道，域名将在启动后自动生成。"
+fi
+
+# IPv6 设置
+printf "\n3. 是否仅 IPv6 (True/False) [默认: False]: "
 read -r IPV6_INPUT
 [ -z "$IPV6_INPUT" ] && IPV6_ONLY="False" || IPV6_ONLY=$IPV6_INPUT
 
-printf "5. 请输入 CDN 优选 IP 或域名 [默认: icook.tw]: "
+# CDN 设置
+printf "4. 请输入 CDN 优选 IP 或域名 [默认: icook.tw]: "
 read -r CDN_INPUT
 [ -z "$CDN_INPUT" ] && CDN_DOMAIN="icook.tw" || CDN_DOMAIN=$CDN_INPUT
 
-printf "6. 请输入起始端口 [默认: 39001]: "
+# 端口设置
+printf "5. 请输入本地监听起始端口 [默认: 39001]: "
 read -r PORT_INPUT
 [ -z "$PORT_INPUT" ] && START_PORT="39001" || START_PORT=$PORT_INPUT
 
@@ -120,12 +136,56 @@ read -r START_NOW
 if [ "$START_NOW" = "y" ] || [ "$START_NOW" = "Y" ]; then
     info "🚀 正在启动容器..."
     $DOCKER_COMPOSE_CMD up -d
+    
     if [ $? -eq 0 ]; then
-        printf "\n${GREEN}✅ ICMP9 部署成功！${NC}\n\n\n"
-        printf "✈️ 节点订阅地址: ${YELLOW}https://${SERVER_HOST}/${API_KEY}${NC}\n\n\n"
+        printf "\n${GREEN}✅ ICMP9 部署成功！${NC}\n"
+        
+        if [ "$TUNNEL_MODE" = "fixed" ]; then
+            # --- 固定隧道：直接显示 ---
+            printf "\n${GREEN}✈️  节点订阅地址:${NC}\n"
+            printf "${YELLOW}https://${SERVER_HOST}/${API_KEY}${NC}\n\n"
+        else
+            # --- 临时隧道：自动轮询等待日志 ---
+            printf "\n${CYAN}⏳ 正在等待 Cloudflare 分配临时域名 (超时60秒)...${NC}\n"
+            printf "${CYAN}   (请稍候，系统正在从日志中抓取订阅链接)${NC}\n"
+            
+            TIMEOUT=60
+            INTERVAL=3
+            ELAPSED=0
+            FOUND_URL=""
+
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+                # 尝试从日志中提取包含 trycloudflare.com 的 URL
+                # 使用 grep -oE 精确提取 URL 部分
+                LOG_URL=$(docker logs icmp9 2>&1 | grep -oE "https://[a-zA-Z0-9-]+\.trycloudflare\.com/${API_KEY}" | tail -n 1)
+                
+                if [ -n "$LOG_URL" ]; then
+                    FOUND_URL="$LOG_URL"
+                    break
+                fi
+                
+                # 打印进度点
+                printf "."
+                sleep $INTERVAL
+                ELAPSED=$((ELAPSED + INTERVAL))
+            done
+            
+            # 换行
+            echo ""
+
+            if [ -n "$FOUND_URL" ]; then
+                printf "\n${GREEN}临时域名获取成功！${NC}\n"
+                printf "${GREEN}✅ 节点订阅地址:${NC}\n"
+                printf "${YELLOW}%s${NC}\n\n" "$FOUND_URL"
+            else
+                printf "\n${YELLOW}⚠️  自动获取超时 (网络可能较慢)。${NC}\n"
+                printf "请稍后手动执行此命令查看地址：\n"
+                printf "${CYAN}docker logs icmp9 | grep 'https://'${NC}\n\n"
+            fi
+        fi
     else
         error "❌ 启动失败。"
     fi
 else
-    warn "已取消启动。"
+    warn "已取消启动。您可以稍后运行 'docker compose up -d' 启动。"
 fi
