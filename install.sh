@@ -140,7 +140,7 @@ read -r IPV6_INPUT
 IPV6_ONLY=$(echo "${IPV6_INPUT:-false}" | tr '[:upper:]' '[:lower:]')
 
 # CDN 设置
-printf "4. 请输入Cloudflare CDN 优选IP或域名 [默认: icook.tw]: "
+printf "4. 请输入Cloudflare CDN优选IP或域名 [默认: icook.tw]: "
 read -r CDN_INPUT
 [ -z "$CDN_INPUT" ] && CDN_DOMAIN="icook.tw" || CDN_DOMAIN=$CDN_INPUT
 
@@ -222,8 +222,16 @@ if [ "$START_NOW" = "y" ] || [ "$START_NOW" = "Y" ]; then
     
     if [ "$TUNNEL_MODE" = "fixed" ]; then
         # --- 固定隧道 ---
+        SUBSCRIBE_URL="https://${CLOUDFLARED_DOMAIN}/${API_KEY}"
+
         printf "\n${GREEN}✈️ 节点订阅地址:${NC}\n"
-        printf "${YELLOW}https://${CLOUDFLARED_DOMAIN}/${API_KEY}${NC}\n\n"
+        printf "${YELLOW}%s${NC}\n\n" "${SUBSCRIBE_URL}"
+
+        printf "${GREEN}📱 正在生成节点订阅二维码...${NC}\n"
+        docker exec icmp9 qrencode -t ANSIUTF8 -m 1 -l H "${SUBSCRIBE_URL}" || {
+            printf "\n${YELLOW}⚠️ 二维码生成失败${NC}\n"
+        }
+
     else
         # --- 临时隧道 ---
         printf "\n${CYAN}⏳ 正在等待 Cloudflare 分配临时域名 (超时60秒)...${NC}\n"
