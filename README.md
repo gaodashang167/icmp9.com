@@ -93,6 +93,7 @@ docker run -d \
   -e ICMP9_IPV6_ONLY=False \
   -e ICMP9_CDN_DOMAIN=icook.tw \
   -e ICMP9_START_PORT=39001 \
+  -e ICMP9_NODE_TAG=ICMP9 \
   -v "$(pwd)/data/subscribe:/root/subscribe" \
   nap0o/icmp9:latest
 ```
@@ -119,6 +120,8 @@ services:
       - ICMP9_CDN_DOMAIN=icook.tw
       # [选填] 起始端口，默认 39001
       - ICMP9_START_PORT=39001
+      # [选填] 节点标识，默认 ICMP9
+      - ICMP9_NODE_TAG=ICMP9     
     volumes:
       - ./data/subscribe:/root/subscribe
 ```

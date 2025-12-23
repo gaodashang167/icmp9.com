@@ -149,6 +149,11 @@ printf "5. 请输入本地监听起始端口 [默认: 39001]: "
 read -r PORT_INPUT
 [ -z "$PORT_INPUT" ] && START_PORT="39001" || START_PORT=$PORT_INPUT
 
+# 节点标识设置
+printf "6. 请输入节点标识 [默认: ICMP9]: "
+read -r NODE_TAG_INPUT
+[ -z "$NODE_TAG_INPUT" ] && NODE_TAG="ICMP9" || NODE_TAG=$NODE_TAG_INPUT
+
 # 4. 生成 docker-compose.yml
 info "⏳ 正在生成 docker-compose.yml..."
 
@@ -166,6 +171,7 @@ services:
       - ICMP9_IPV6_ONLY=${IPV6_ONLY}
       - ICMP9_CDN_DOMAIN=${CDN_DOMAIN}
       - ICMP9_START_PORT=${START_PORT}
+      - ICMP9_NODE_TAG=${NODE_TAG}
     volumes:
       - ./data/subscribe:/root/subscribe
 EOF
